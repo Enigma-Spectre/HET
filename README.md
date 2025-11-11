@@ -1,7 +1,26 @@
-# HET: Hypercomplex Eulerian Transformer  
-**Train**: `het_train.py` • **Inference**: `het_inference.py`
+# HET: Hypercomplex Eulerian Transformer
+**Train**: [`het_train.py`](./het_train.py) • **Inference**: [`het_inference.py`](./het_inference.py)
 
 A compact research rig for byte-level causal LMs with optional **Quaternion Attention** and **Quaternion RoPE**, plus T4-safe AMP, cosine LR with warmup, sliding-window corpus streaming, and fused quaternion linears for fast inference.
+
+---
+
+## At a glance
+
+**Who is this for?**
+- Researchers and hobbyists who already know basic PyTorch and want to explore quaternion attention/rope variants without a huge codebase.
+- Practitioners looking for a lightweight byte-level LM trainer that can run on a single GPU (or CPU for smoke tests).
+
+**Quickstart roadmap**
+1. Clone the repo and set up a fresh Python 3.10+ virtual environment.
+2. Drop your corpus into a single UTF-8 text file (concatenate sources if needed).
+3. Run the CPU smoke test to confirm everything works, then switch to the CUDA quaternion quickstart.
+4. Use [`het_inference.py`](./het_inference.py) to sample from the checkpoint you just trained.
+
+**Main entry points**
+- [`het_train.py`](./het_train.py) – training loop, quaternion modules, fused export.
+- [`het_inference.py`](./het_inference.py) – load checkpoints (standard or fused) for generation.
+- [`het_ablate.py`](./het_ablate.py) – optional ablation runner that wraps training/inference.
 
 ---
 
@@ -13,13 +32,14 @@ A compact research rig for byte-level causal LMs with optional **Quaternion Atte
   - [Quickstart](#quickstart)
   - [Important constraints](#important-constraints)
   - [Key behaviors](#key-behaviors)
-  - [All CLI flags](#all-cli-flags)
+  - [Key CLI options](#key-cli-options)
+  - [Full CLI reference](#full-cli-reference)
   - [Examples](#training-examples)
 - [Inference (`het_inference.py`)](#inference-het_inferencepy)
   - [Quickstart](#inference-quickstart)
   - [One-shot mode](#one-shot-mode)
   - [REPL mode](#repl-mode)
-  - [All CLI flags](#inference-cli-flags)
+  - [CLI reference](#inference-cli-flags)
   - [Examples](#inference-examples)
 - [Checkpoints & Formats](#checkpoints--formats)
 - [AMP / dtypes](#amp--dtypes)
@@ -29,14 +49,15 @@ A compact research rig for byte-level causal LMs with optional **Quaternion Atte
 - [Performance tips](#performance-tips)
 - [Reproducibility](#reproducibility)
 - [Ablations (optional)](#ablations-optional)
+- [License / Citation](#license--citation)
 
 ---
 
 ## Features
 - **Byte tokenizer (256-vocab)** — no preprocessing; good for raw text and ragged corpora.
 - **Sliding-window streaming** — overlap windows across the full corpus with `sliding_keep_pct`.
-- **Quaternion stack**  
-  - **Quaternion Attention** (`--quat_attention`): Q/K/V/O via quaternion linears.  
+- **Quaternion stack**
+  - **Quaternion Attention** (`--quat_attention`): Q/K/V/O via quaternion linears.
   - **Quaternion RoPE** (`--quat_rope`, `--qrope_axis`, `--qrope_conjugate`).
 - **Cosine LR with warmup**, AdamW, grad clipping.
 - **AMP**: bf16/fp16 autocast on CUDA; safe on T4 (bf16 falls back to fp16).
@@ -48,74 +69,106 @@ A compact research rig for byte-level causal LMs with optional **Quaternion Atte
 
 ## Install
 ```bash
-# Python 3.10+ recommended
+# 1) Clone the project
+git clone https://github.com/<your-org>/HET.git
+cd HET
+
+# 2) Create & activate a virtual environment (Python 3.10+ recommended)
 python -m venv .venv
-source .venv/bin/activate     # (PowerShell) .\\.venv\\Scripts\\Activate.ps1
-pip install torch --index-url https://download.pytorch.org/whl/cu124  # choose your CUDA/CPU build
+source .venv/bin/activate     # (PowerShell) .\.venv\Scripts\Activate.ps1
+
+# 3) Install dependencies
+pip install --upgrade pip
+pip install torch --index-url https://download.pytorch.org/whl/cu124  # choose the wheel for your CUDA/CPU setup
 pip install numpy
 ```
 
-> Torch install line depends on your platform/CUDA. Use PyTorch’s selector if unsure.
+| Package | Why you need it |
+|---------|-----------------|
+| `torch` | Core training/inference backend, quaternion ops, AMP, dataloaders. |
+| `numpy` | Lightweight helpers (tensor conversion & configuration). |
+
+> The torch wheel URL varies by CUDA version and OS. Use [PyTorch's selector](https://pytorch.org/get-started/locally/) if unsure.
 
 ---
 
 ## Data
-Provide a single text file:
+- Provide a **single UTF-8 text file** (no extra preprocessing required).
+- Concatenate multiple sources with a simple `cat file1 file2 > Corpus.txt` if desired.
+- Keep line endings consistent (`\n`). For very small corpora, use a higher `sliding_keep_pct` to recycle tokens efficiently.
+
+Example minimal corpus:
 ```text
-./Corpus.txt
+./data/sample_corpus.txt
 ```
-The trainer uses a byte-level tokenizer, so **no preprocessing** required.
+Contents (`sample_corpus.txt`):
+```
+In the beginning the byte stream was small.
+Yet the model learned to whisper in quaternions.
+```
 
 ---
 
 ## Training (`het_train.py`)
 
 ### Quickstart
-Baseline (standard attention + standard RoPE), CUDA, AMP, 2 epochs:
+
+#### 1. CPU-friendly smoke test
+This run verifies the environment on any machine. Expect slow throughput, but it confirms the pipeline end-to-end.
+```bash
+python het_train.py --corpus ./Corpus.txt --device cpu \
+  --d_model 128 --n_layers 4 --n_heads 4 \
+  --seq_len 256 --batch_size 8 --epochs 0.2 \
+  --lr 5e-4 --warmup 50 --sliding_keep_pct 0.2
+```
+
+#### 2. CUDA quaternion quickstart
+Standard attention/rope can be enabled by omitting the quaternion flags.
 ```bash
 python het_train.py --corpus ./Corpus.txt --device cuda --amp \
   --d_model 256 --n_layers 12 --n_heads 8 \
   --seq_len 512 --batch_size 48 --epochs 2 \
   --lr 7e-5 --min_lr 1e-5 --warmup 300 \
-  --sliding_keep_pct 0.14
-```
-
-Quaternion Attention + Quaternion RoPE (cycle axis):
-```bash
-python het_train.py --corpus ./Corpus.txt --device cuda --amp \
-  --d_model 256 --n_layers 12 --n_heads 8 --seq_len 512 --batch_size 48 \
-  --epochs 2 --lr 7e-5 --min_lr 1e-5 --warmup 300 \
   --sliding_keep_pct 0.14 --quat_attention --quat_rope --qrope_axis cycle
 ```
 
-Resume from a full checkpoint:
+#### 3. Resume or warm-start
 ```bash
+# Resume full state (optimizer, step, etc.)
 python het_train.py --corpus ./Corpus.txt --device cuda --amp \
   --resume_ckpt ckpts_quat/model_step1200.pt
-```
 
-Warm-start weights **only** (no optimizer/step state):
-```bash
+# Warm-start weights only
 python het_train.py --corpus ./Corpus.txt --device cuda --amp \
   --load_weights ckpts_quat/model_step1200.pt
 ```
 
 ### Important constraints
-- **Quaternion Attention requires 4-channel head dims**:
-  ```
-  d_model % (4 * n_heads) == 0
-  ```
-  The script enforces this and exits with an error if violated.
-- **Quaternion RoPE requires Quaternion Attention**: `--quat_attention` must be set when using `--quat_rope`.
+> ⚠️ **Quaternion attention requires head dims divisible by 4**
+> ```
+> d_model % (4 * n_heads) == 0
+> ```
+> The script enforces this and exits with an error if violated.
+>
+> 🧭 **Quaternion RoPE depends on quaternion attention** — pass `--quat_attention` when using `--quat_rope`.
 
 ### Key behaviors
-- **Cosine LR** with `--warmup` (in steps). If `--steps > 0`, train for exactly that many steps; otherwise derive from `--epochs`.
-- **Sliding windows**: stride = `seq_len - floor(seq_len * sliding_keep_pct)`. Controls token reuse vs. coverage.
-- **Eval/Checkpoints**: every `--eval_every` steps; checkpoint saved **only when** `val_loss` improves; name `model_step{N}.pt`.
+- **Cosine LR** with `--warmup` (in steps). If `--steps > 0`, training stops exactly at that step count; otherwise derived from `--epochs`.
+- **Sliding windows**: stride = `seq_len - floor(seq_len * sliding_keep_pct)`. Lower keep percentage → more new tokens per window.
+- **Eval/Checkpoints**: every `--eval_every` steps; checkpoint saved **only when** `val_loss` improves; named `model_step{N}.pt`.
 - **Device & dtype**: compute dtype via AMP (`--dtype fp16|bf16|fp32`); weights stay FP32.
 
-### All CLI flags
-```
+### Key CLI options
+| Topic | Flag(s) | Notes |
+|-------|---------|-------|
+| Data | `--corpus`, `--train_split`, `--sliding_keep_pct` | Control input file and streaming overlap. |
+| Optimization | `--lr`, `--min_lr`, `--warmup`, `--weight_decay`, `--grad_clip` | Cosine scheduler with warmup. |
+| Runtime | `--device`, `--amp`, `--dtype`, `--num_workers`, `--pin_memory`, `--compile` | Target hardware + performance tweaks. |
+| Quaternion stack | `--quat_attention`, `--quat_rope`, `--qrope_axis`, `--qrope_conjugate` | Enable quaternion-specific features. |
+| Checkpoints | `--out_dir`, `--eval_every`, `--resume_ckpt`, `--load_weights`, `--fast_export` | Save/restore behavior and fused export. |
+
+### Full CLI reference
+```text
 --corpus (str, required)
 --out_dir (str, default: ckpts_quat)
 --d_model (int, 512)
@@ -174,31 +227,34 @@ python het_train.py --corpus ./Corpus.txt --device cuda --amp \
 ---
 
 ## Inference (`het_inference.py`)
+`het_inference.py` reconstructs the model from the checkpoint’s embedded config. Train first (or download a released checkpoint), then sample with the commands below.
 
 ### Inference Quickstart
-Run one-shot generation from a training checkpoint:
 ```bash
 python het_inference.py --ckpt ckpts_quat/model_step1200.pt --device cuda \
   --dtype fp16 --prompt "Summarize the central themes of The Lord of the Rings." \
   --temperature 0.65 --top_p 0.95 --max_new 128
 ```
+Expected output snippet:
+```
+Reply: The tale follows diverse peoples who must cooperate...
+```
 
-REPL chat:
+Interactive REPL chat:
 ```bash
 python het_inference.py --ckpt ckpts_quat/model_step1200.pt --device cuda --dtype fp16
 ```
 
-> The inference model is reconstructed from the saved `config` embedded in the checkpoint. If you exported a fused model, pass `--fast` to use `FastQuaternionLinear`.
+> Exported fused models load the same way—just add `--fast` to ensure `FastQuaternionLinear` is used.
 
 ### One-shot mode
-Provide `--prompt` to generate once and exit. Useful for batch eval or scripts.
+Provide `--prompt` to generate once and exit. Useful for batch evaluation scripts.
 
 ### REPL mode
-No `--prompt` → a simple chat REPL with byte-level history.  
-`--sliding_keep_pct` (in REPL) limits how much prior transcript is retained between turns.
+No `--prompt` → a simple chat REPL with byte-level history. `--sliding_keep_pct` controls how much prior transcript is retained between turns.
 
-### Inference CLI flags
-```
+### CLI reference
+```text
 --ckpt (str, required)           # checkpoint from het_train.py
 --device (str, default cuda if available else cpu)
 --dtype (fp32|fp16|bf16; default fp16)
@@ -214,7 +270,7 @@ No `--prompt` → a simple chat REPL with byte-level history.
 --sys_prefix (str, default "You are a helpful model.")
 --user_prefix (str, default "User: ")
 --asst_prefix (str, default "Reply: ")
---stop_str (str, default "\\nUser: ")
+--stop_str (str, default "\nUser: ")
 ```
 
 ### Inference examples
@@ -283,26 +339,26 @@ out_dir/model_fused_infer.pt
 ---
 
 ## Troubleshooting
-**Error:** *“Q-RoPE requires --quat_attention…”*  
+**Error:** *“Q-RoPE requires --quat_attention…”*
 → Add `--quat_attention` when using `--quat_rope`.
 
-**Error:** *“d_model must be divisible by 4*n_heads…”*  
+**Error:** *“d_model must be divisible by 4*n_heads…”*
 → Ensure `d_model % (4 * n_heads) == 0` whenever `--quat_attention` is set.
 
-**NaNs or loss spikes**  
+**NaNs or loss spikes**
 - Lower `--lr`, increase `--warmup`, or disable AMP (`--dtype fp32`, omit `--amp`) to test.
 - Reduce `--batch_size` or `--seq_len` to fit memory; keep overlap reasonable.
 
-**Slow dataloader**  
+**Slow dataloader**
 - Increase `--num_workers`; set `--pin_memory` on CUDA.
 
-**No checkpoints saved**  
+**No checkpoints saved**
 - If `val_loss` never improves, no file is written. Reduce `--eval_every` or extend training (`--epochs` or `--steps`).
 
 ---
 
 ## Performance tips
-- Prefer **CUDA + AMP** (`--amp`, `--dtype bf16` if GPU supports it).  
+- Prefer **CUDA + AMP** (`--amp`, `--dtype bf16` if GPU supports it).
 - Use **overlap** (`--sliding_keep_pct ~0.1–0.2`) for better token efficiency on small corpora.
 - Keep `--eval_every` modest (e.g., 300–800) to avoid frequent stalls on big models.
 - For quaternions: keep heads numerous enough that `d_model / n_heads` is a multiple of 4.
@@ -321,5 +377,4 @@ If you’re using the companion `het_ablate.py`, it runs A0–A3 variants and (o
 
 ## License / Citation
 This is a research scaffold. If you publish results, note quaternion attention and RoPE variants and include training details (overlap, cosine LR, warmup, AMP settings, and eval cadence).
-#   H E T  
  
