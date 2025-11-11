@@ -7,20 +7,17 @@ A compact research rig for byte-level causal LMs with optional **Quaternion Atte
 
 ## At a glance
 
-### Who is this for?
-
+**Who is this for?**
 - Researchers and hobbyists who already know basic PyTorch and want to explore quaternion attention/rope variants without a huge codebase.
 - Practitioners looking for a lightweight byte-level LM trainer that can run on a single GPU (or CPU for smoke tests).
 
-### Quickstart roadmap
-
+**Quickstart roadmap**
 1. Clone the repo and set up a fresh Python 3.10+ virtual environment.
 2. Drop your corpus into a single UTF-8 text file (concatenate sources if needed).
 3. Run the CPU smoke test to confirm everything works, then switch to the CUDA quaternion quickstart.
 4. Use [`het_inference.py`](./het_inference.py) to sample from the checkpoint you just trained.
 
-### Main entry points
-
+**Main entry points**
 - [`het_train.py`](./het_train.py) – training loop, quaternion modules, fused export.
 - [`het_inference.py`](./het_inference.py) – load checkpoints (standard or fused) for generation.
 - [`het_ablate.py`](./het_ablate.py) – optional ablation runner that wraps training/inference.
@@ -99,7 +96,6 @@ pip install numpy
 ---
 
 ## Data
-
 - Provide a **single UTF-8 text file** (no extra preprocessing required).
 - Concatenate multiple sources with a simple `cat file1 file2 > Corpus.txt` if desired.
 - Keep line endings consistent (`\n`). For very small corpora, use a higher `sliding_keep_pct` to recycle tokens efficiently.
