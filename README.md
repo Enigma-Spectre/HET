@@ -1,4 +1,5 @@
 # HET: Hypercomplex Eulerian Transformer
+**Train**: [`het_train.py`](./het_train.py) • **Inference**: [`het_inference.py`](./het_inference.py)
 
 <p align="center">
   <a href="./het_train.py"><strong>Train</strong></a> ·
@@ -12,39 +13,24 @@
 
 ## At a glance
 
-<table>
-  <tr>
-    <td width="33%">
-      <h4 align="center">Who is this for?</h4>
-      <ul>
-        <li>Researchers and hobbyists already comfortable with PyTorch who want quaternion attention/rope variants without a huge framework.</li>
-        <li>Practitioners needing a byte-level LM trainer that runs on a single GPU (or CPU for smoke tests).</li>
-      </ul>
-    </td>
-    <td width="33%">
-      <h4 align="center">Quickstart roadmap</h4>
-      <ol>
-        <li>Clone the repo and create a fresh Python 3.10+ virtual environment.</li>
-        <li>Drop your corpus into a single UTF-8 text file (concatenate sources if needed).</li>
-        <li>Run the CPU smoke test first, then upgrade to the CUDA quaternion quickstart.</li>
-        <li>Sample from your checkpoint with <code>het_inference.py</code>.</li>
-      </ol>
-    </td>
-    <td width="34%">
-      <h4 align="center">Main entry points</h4>
-      <ul>
-        <li><a href="./het_train.py"><code>het_train.py</code></a> – training loop, quaternion modules, fused export.</li>
-        <li><a href="./het_inference.py"><code>het_inference.py</code></a> – load checkpoints (standard or fused) for generation.</li>
-        <li><a href="./het_ablate.py"><code>het_ablate.py</code></a> – optional ablation runner wrapping training/inference.</li>
-      </ul>
-    </td>
-  </tr>
-</table>
+**Who is this for?**
+- Researchers and hobbyists who already know basic PyTorch and want to explore quaternion attention/rope variants without a huge codebase.
+- Practitioners looking for a lightweight byte-level LM trainer that can run on a single GPU (or CPU for smoke tests).
+
+**Quickstart roadmap**
+1. Clone the repo and set up a fresh Python 3.10+ virtual environment.
+2. Drop your corpus into a single UTF-8 text file (concatenate sources if needed).
+3. Run the CPU smoke test to confirm everything works, then switch to the CUDA quaternion quickstart.
+4. Use [`het_inference.py`](./het_inference.py) to sample from the checkpoint you just trained.
+
+**Main entry points**
+- [`het_train.py`](./het_train.py) – training loop, quaternion modules, fused export.
+- [`het_inference.py`](./het_inference.py) – load checkpoints (standard or fused) for generation.
+- [`het_ablate.py`](./het_ablate.py) – optional ablation runner that wraps training/inference.
 
 ---
 
-<details>
-<summary><strong>Contents</strong></summary>
+## Contents
 
 - [Features](#features)
 - [Install](#install)
@@ -71,8 +57,6 @@
 - [Reproducibility](#reproducibility)
 - [Ablations (optional)](#ablations-optional)
 - [License / Citation](#license--citation)
-
-</details>
 
 ---
 
@@ -118,7 +102,6 @@ pip install numpy
 ---
 
 ## Data
-
 - Provide a **single UTF-8 text file** (no extra preprocessing required).
 - Concatenate multiple sources with a simple `cat file1 file2 > Corpus.txt` if desired.
 - Keep line endings consistent (`\n`). For very small corpora, use a higher `sliding_keep_pct` to recycle tokens efficiently.
