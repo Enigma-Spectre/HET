@@ -1,0 +1,15 @@
+# Python temporary files
+__pycache__/
+*.pyc
+
+# Large data and model folders
+ckpts_quat/
+memory/mem_het
+
+# Virtual environment
+venv/
+.env
+
+# IDE files
+.vscode/
+.idea/
