@@ -25,6 +25,7 @@ A compact research rig for byte-level causal LMs with optional **Quaternion Atte
 ---
 
 ## Contents
+
 - [Features](#features)
 - [Install](#install)
 - [Data](#data)
@@ -54,6 +55,7 @@ A compact research rig for byte-level causal LMs with optional **Quaternion Atte
 ---
 
 ## Features
+
 - **Byte tokenizer (256-vocab)** — no preprocessing; good for raw text and ragged corpora.
 - **Sliding-window streaming** — overlap windows across the full corpus with `sliding_keep_pct`.
 - **Quaternion stack**
@@ -68,6 +70,7 @@ A compact research rig for byte-level causal LMs with optional **Quaternion Atte
 ---
 
 ## Install
+
 ```bash
 # 1) Clone the project
 git clone https://github.com/<your-org>/HET.git
