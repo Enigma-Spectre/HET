@@ -1,7 +1,13 @@
 # HET: Hypercomplex Eulerian Transformer
 **Train**: [`het_train.py`](./het_train.py) • **Inference**: [`het_inference.py`](./het_inference.py)
 
-A compact research rig for byte-level causal LMs with optional **Quaternion Attention** and **Quaternion RoPE**, plus T4-safe AMP, cosine LR with warmup, sliding-window corpus streaming, and fused quaternion linears for fast inference.
+<p align="center">
+  <a href="./het_train.py"><strong>Train</strong></a> ·
+  <a href="./het_inference.py"><strong>Inference</strong></a> ·
+  <a href="./het_ablate.py"><strong>Ablate</strong></a>
+</p>
+
+> Compact research rig for byte-level causal LMs with optional **Quaternion Attention** and **Quaternion RoPE**, paired with T4-safe AMP, cosine LR with warmup, streaming corpora, and fused quaternion linears for fast inference.
 
 ---
 
